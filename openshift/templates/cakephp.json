@@ -33,42 +33,6 @@
       }
     },
     {
-      "kind": "Service",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "${NAME}",
-        "annotations": {
-          "description": "Exposes and load balances the application pods"
-        }
-      },
-      "spec": {
-        "ports": [
-          {
-            "name": "web",
-            "port": 8080,
-            "targetPort": 8080
-          }
-        ],
-        "selector": {
-          "name": "${NAME}"
-        }
-      }
-    },
-    {
-      "kind": "Route",
-      "apiVersion": "v1",
-      "metadata": {
-        "name": "${NAME}"
-      },
-      "spec": {
-        "host": "${APPLICATION_DOMAIN}",
-        "to": {
-          "kind": "Service",
-          "name": "${NAME}"
-        }
-      }
-    },
-    {
       "kind": "ImageStream",
       "apiVersion": "v1",
       "metadata": {
@@ -139,8 +103,8 @@
       }
     },
     {
-      "kind": "DeploymentConfig",
-      "apiVersion": "v1",
+      "kind": "Service",
+      "apiVersion": "serving.knative.dev/v1",
       "metadata": {
         "name": "${NAME}",
         "annotations": {
@@ -149,100 +113,68 @@
         }
       },
       "spec": {
-        "strategy": {
-          "type": "Rolling"
-        },
-        "triggers": [
-          {
-            "type": "ImageChange",
-            "imageChangeParams": {
-              "automatic": true,
-              "containerNames": [
-                "cakephp-example"
-              ],
-              "from": {
-                "kind": "ImageStreamTag",
-                "name": "${NAME}:latest"
-              }
-            }
-          },
-          {
-            "type": "ConfigChange"
-          }
-        ],
-        "replicas": 1,
-        "selector": {
-          "name": "${NAME}"
-        },
         "template": {
-          "metadata": {
-            "name": "${NAME}",
-            "labels": {
-              "name": "${NAME}"
-            }
-          },
-          "spec": {
-            "containers": [
-              {
-                "name": "cakephp-example",
-                "image": " ",
-                "ports": [
-                  {
-                    "containerPort": 8080
-                  }
-                ],
-                "readinessProbe": {
-                  "timeoutSeconds": 3,
-                  "initialDelaySeconds": 3,
-                  "periodSeconds": 60,
-                  "httpGet": {
-                    "path": "/",
-                    "port": 8080
-                  }
-                },
-                "livenessProbe": {
-                  "timeoutSeconds": 3,
-                  "initialDelaySeconds": 30,
-                  "periodSeconds": 60,
-                  "httpGet": {
-                    "path": "/",
-                    "port": 8080
-                  }
-                },
-                "env": [
-                  {
-                    "name": "CAKEPHP_SECRET_TOKEN",
-                    "valueFrom": {
-                      "secretKeyRef" : {
-                        "name" : "${NAME}",
-                        "key" : "cakephp-secret-token"
+            "spec": {
+                "containers": [
+                    {
+                        "name": "cakephp-example",
+                        "image": "image-registry.openshift-image-registry.svc:5000/example/${NAME}:latest",
+                        "ports": [
+                          {
+                            "containerPort": 8080
+                          }
+                        ],
+                        "readinessProbe": {
+                          "timeoutSeconds": 3,
+                          "initialDelaySeconds": 3,
+                          "failureThreshold": 3,
+                          "periodSeconds": 60,
+                          "httpGet": {
+                            "path": "/"
+                          }
+                        },
+                        "livenessProbe": {
+                          "timeoutSeconds": 3,
+                          "initialDelaySeconds": 30,
+                          "periodSeconds": 60,
+                          "httpGet": {
+                            "path": "/"
+                          }
+                        },
+                        "env": [
+                          {
+                            "name": "CAKEPHP_SECRET_TOKEN",
+                            "valueFrom": {
+                              "secretKeyRef" : {
+                                "name" : "${NAME}",
+                                "key" : "cakephp-secret-token"
+                              }
+                            }
+                          },
+                          {
+                            "name": "CAKEPHP_SECURITY_SALT",
+                            "valueFrom": {
+                              "secretKeyRef" : {
+                                "name" : "${NAME}",
+                                "key" : "cakephp-security-salt"
+                              }
+                            }
+                          },
+                          {
+                            "name": "OPCACHE_REVALIDATE_FREQ",
+                            "value": "${OPCACHE_REVALIDATE_FREQ}"
+                          }
+                        ],
+                        "resources": {
+                          "limits": {
+                            "memory": "${MEMORY_LIMIT}"
+                          }
+                        }
                       }
-                    }
-                  },
-                  {
-                    "name": "CAKEPHP_SECURITY_SALT",
-                    "valueFrom": {
-                      "secretKeyRef" : {
-                        "name" : "${NAME}",
-                        "key" : "cakephp-security-salt"
-                      }
-                    }
-                  },
-                  {
-                    "name": "OPCACHE_REVALIDATE_FREQ",
-                    "value": "${OPCACHE_REVALIDATE_FREQ}"
-                  }
-                ],
-                "resources": {
-                  "limits": {
-                    "memory": "${MEMORY_LIMIT}"
-                  }
+                    ]
                 }
-              }
-            ]
-          }
-        }
-      }
+            }
+         }
     }
   ],
   "parameters": [
@@ -290,12 +222,6 @@
       "name": "CONTEXT_DIR",
       "displayName": "Context Directory",
       "description": "Set this to the relative path to your project if it is not in the root of your repository."
-    },
-    {
-      "name": "APPLICATION_DOMAIN",
-      "displayName": "Application Hostname",
-      "description": "The exposed hostname that will route to the CakePHP service, if left blank a value will be defaulted.",
-      "value": ""
     },
     {
       "name": "GITHUB_WEBHOOK_SECRET",
